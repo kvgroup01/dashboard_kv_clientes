@@ -1,0 +1,629 @@
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ─── DESIGN SYSTEM TOKENS ──────────────────────────────── */
+:root {
+  /* Fundos */
+  --bg: #0c0f0a;
+  --surface: #131810;
+  --surface-2: #191e15;
+  --border: #232b1e;
+
+  /* Texto */
+  --ink: #e4ede0;
+  --muted: #607058;
+
+  /* Accent verde */
+  --accent: #7cbd3a;
+  --accent-dim: rgba(124, 189, 58, 0.10);
+  --accent-border: rgba(124, 189, 58, 0.25);
+
+  /* Semânticas */
+  --green: #22c55e;
+  --green-wpp: #25d366;
+  --blue: #4f8ef7;
+  --blue-dim: rgba(79, 142, 247, 0.10);
+  --orange: #f59e0b;
+  --orange-dim: rgba(245, 158, 11, 0.10);
+  --red: #ef4444;
+  --red-dim: rgba(239, 68, 68, 0.10);
+  --purple: #a855f7;
+  --purple-dim: rgba(168, 85, 247, 0.10);
+  --gray: #6b7280;
+
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   LIGHT MODE — classe .light
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.light {
+  /* Fundos — branco puro com cards em cinza */
+  --bg: #ffffff;
+  --surface: #f4f4f5;
+  --surface-2: #ebebec;
+
+  /* Bordas — cinza claro visível */
+  --border: #e2e2e4;
+
+  /* Textos — máximo contraste */
+  --ink: #0f0f10;
+  --muted: #8a8a8e;
+
+  /* Accent — verde mais escuro pro fundo branco (contraste AAA) */
+  --accent: #3d7a1a;
+  --accent-dim: rgba(61, 122, 26, 0.08);
+  --accent-border: rgba(61, 122, 26, 0.2);
+
+  /* Semânticas — versões mais escuras para contraste no branco */
+  --green: #16a34a;
+  --green-wpp: #15803d;
+  --blue: #1d4ed8;
+  --blue-dim: rgba(29, 78, 216, 0.08);
+  --orange: #b45309;
+  --orange-dim: rgba(180, 83, 9, 0.08);
+  --red: #b91c1c;
+  --red-dim: rgba(185, 28, 28, 0.08);
+  --purple: #6d28d9;
+  --purple-dim: rgba(109, 40, 217, 0.08);
+
+  /* shadcn/ui — formato HSL obrigatório */
+  --background: 0 0% 100%;
+  --foreground: 240 6% 6%;
+  --card: 240 5% 96%;
+  --card-foreground: 240 6% 6%;
+  --popover: 240 5% 92%;
+  --popover-foreground: 240 6% 6%;
+  --primary: 100 65% 29%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 240 5% 92%;
+  --secondary-foreground: 240 6% 6%;
+  --muted: 240 5% 92%;
+  --muted-foreground: 240 4% 54%;
+  --accent: 100 65% 29%;
+  --accent-foreground: 0 0% 100%;
+  --border: 240 6% 88%;
+  --input: 240 6% 88%;
+  --ring: 100 65% 29%;
+}
+
+/* Transição suave — aplicar a TODOS os elementos */
+*,
+*::before,
+*::after {
+  transition: background-color 200ms ease, border-color 200ms ease, color 100ms ease, fill 200ms ease;
+}
+
+/* Body herda corretamente */
+.light body,
+.light {
+  background-color: #ffffff;
+  color: #0f0f10;
+}
+
+/* Scrollbar no light mode */
+.light ::-webkit-scrollbar-track {
+  background: #f4f4f5;
+}
+
+.light ::-webkit-scrollbar-thumb {
+  background: #e2e2e4;
+}
+
+.light ::-webkit-scrollbar-thumb:hover {
+  background: #8a8a8e;
+}
+
+
+/* ─── SHADCN mapeados para o DS (HSL) ─────────────────────────── */
+:root {
+  --radius: 0.75rem;
+
+  /* Backgrounds */
+  --background: 120 14% 6%;
+  /* #0c0f0a */
+  --card: 120 14% 8%;
+  /* #131810 */
+  --popover: 120 14% 9%;
+  /* #191e15 */
+  --primary: 88 52% 48%;
+  /* #7cbd3a */
+  --secondary: 120 14% 9%;
+  --muted: 120 12% 14%;
+  --accent: 120 14% 9%;
+
+  /* Foregrounds (Textos) */
+  --foreground: 228 14% 90%;
+  /* #e4ede0 */
+  --card-foreground: 228 14% 90%;
+  --popover-foreground: 228 14% 90%;
+  --primary-foreground: 138 100% 5%;
+  /* #0c0f0a */
+  --secondary-foreground: 228 14% 90%;
+  --muted-foreground: 120 8% 40%;
+  /* #607058 */
+  --accent-foreground: 228 14% 90%;
+  --destructive-foreground: 228 14% 90%;
+
+  /* Borders / Inputs */
+  --destructive: 0 84% 60%;
+  /* #ef4444 */
+  --border: 120 12% 14%;
+  /* #232b1e */
+  --input: 120 12% 14%;
+  --ring: 88 52% 48%;
+  /* #7cbd3a */
+}
+
+@theme {
+  --font-sans: "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+/* ─── BASE GLOBAL ────────────────────────────────────────── */
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-weight: 500;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ─── SHADCN OVERRIDES ────────────────────────────────────── */
+@layer base {
+  * {
+    border-color: hsl(var(--border));
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+  }
+
+  /* Garantir que NENHUM elemento herde borda branca */
+  *,
+  *::before,
+  *::after {
+    border-color: hsl(var(--border));
+  }
+
+  /* Sobrescrever qualquer border-color inline que possa ter sido gerado */
+  .border,
+  [class*="border-"] {
+    border-color: hsl(var(--border)) !important;
+  }
+
+  /* Inputs, selects e textareas */
+  input,
+  select,
+  textarea {
+    border-color: hsl(var(--border)) !important;
+  }
+
+  input:focus,
+  select:focus,
+  textarea:focus {
+    border-color: #7cbd3a !important;
+    outline: none !important;
+    box-shadow: 0 0 0 2px rgba(124, 189, 58, 0.15) !important;
+  }
+
+  /* Dividers e separadores */
+  hr,
+  [role="separator"],
+  [data-orientation="horizontal"] {
+    border-color: hsl(var(--border)) !important;
+    background-color: hsl(var(--border)) !important;
+  }
+}
+
+/* ─── UTILITÁRIOS DS ─────────────────────────────────────── */
+
+/* Eyebrow label (ex: "FUNIL", "EVOLUÇÃO DIÁRIA") */
+.ds-eyebrow {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ds-eyebrow::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* Funil step */
+.funnel-step {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 48px;
+  margin-bottom: 8px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 14px;
+  transition: transform 150ms ease;
+}
+
+.funnel-step:hover {
+  transform: scaleX(1.01);
+}
+
+/* ─── ANIMAÇÕES ──────────────────────────────────────────── */
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes progress {
+  0% {
+    transform: translateX(-100%);
+  }
+
+  50% {
+    transform: translateX(-10%);
+  }
+
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes pulse-soft {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-fade-up {
+  animation: fadeUp 400ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-progress {
+  animation: progress 2s infinite ease-in-out;
+}
+
+.animate-pulse-soft {
+  animation: pulse-soft 2s infinite ease-in-out;
+}
+
+/* Stagger helpers */
+.stagger-1 {
+  animation-delay: 60ms;
+}
+
+.stagger-2 {
+  animation-delay: 120ms;
+}
+
+.stagger-3 {
+  animation-delay: 180ms;
+}
+
+.stagger-4 {
+  animation-delay: 240ms;
+}
+
+.stagger-5 {
+  animation-delay: 300ms;
+}
+
+/* ─── HOVER CARDS ───────────────────────────────────────── */
+.ds-card-hover {
+  transition: transform 150ms ease, box-shadow 150ms ease;
+}
+
+.ds-card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(124, 189, 58, 0.08);
+}
+
+/* ─── TABLE ROWS ─────────────────────────────────────────── */
+.ds-table-row {
+  transition: background 150ms ease;
+}
+
+.ds-table-row:hover {
+  background: var(--surface-2) !important;
+}
+
+/* ─── PERIOD FILTER FADE ─────────────────────────────────── */
+.kpi-fade {
+  transition: opacity 200ms ease;
+  opacity: 1;
+}
+
+.kpi-fade.loading {
+  opacity: 0.4;
+}
+
+/* ─── TOOLTIP RECHARTS ───────────────────────────────────── */
+.recharts-tooltip-wrapper .recharts-default-tooltip,
+.ds-tooltip {
+  background: var(--surface-2) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 10px !important;
+  padding: 10px 14px !important;
+  box-shadow: none !important;
+  color: var(--ink) !important;
+}
+
+.recharts-tooltip-label {
+  color: var(--muted) !important;
+  font-family: "JetBrains Mono", monospace !important;
+  font-size: 10px !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase !important;
+  margin-bottom: 6px !important;
+}
+
+.recharts-tooltip-item {
+  color: var(--ink) !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+}
+
+
+/* ─── SCROLLBAR ──────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--surface);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+}
+
+/* ══════════════════════════════════════════════════════════
+   DESIGN SYSTEM — COMPONENT OVERRIDES (Prompt 2)
+══════════════════════════════════════════════════════════ */
+
+/* ─── CARD ───────────────────────────────────────────────── */
+[data-slot="card"] {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 14px !important;
+  box-shadow: none !important;
+  transition: box-shadow 200ms ease !important;
+}
+
+[data-slot="card"]:hover {
+  box-shadow: 0 0 0 1px var(--accent-border) !important;
+}
+
+/* ─── BADGES ─────────────────────────────────────────────── */
+.badge-green {
+  background: var(--accent-dim);
+  color: var(--accent);
+  border: 1px solid var(--accent-border);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 2px 10px;
+  border-radius: 20px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.badge-blue {
+  background: var(--blue-dim);
+  color: var(--blue);
+  border: 1px solid rgba(79, 142, 247, 0.25);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 2px 10px;
+  border-radius: 20px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.badge-orange {
+  background: var(--orange-dim);
+  color: var(--orange);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 2px 10px;
+  border-radius: 20px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.badge-red {
+  background: var(--red-dim);
+  color: var(--red);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 2px 10px;
+  border-radius: 20px;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* ─── BOTÕES PRIMÁRIOS ───────────────────────────────────── */
+[data-slot="button"],
+button.btn-primary {
+  border-radius: 8px;
+  transition: all 150ms ease;
+}
+
+button.btn-primary {
+  background: var(--accent);
+  color: #0c0f0a;
+  font-weight: 700;
+}
+
+button.btn-primary:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+button.btn-primary:active {
+  transform: translateY(0);
+}
+
+/* ─── BOTÕES SECUNDÁRIOS / OUTLINE ───────────────────────── */
+button.btn-secondary {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: 8px;
+  transition: all 150ms ease;
+}
+
+button.btn-secondary:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ─── BOTÕES DE PERÍODO (pills) ──────────────────────────── */
+.btn-period {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 5px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 200ms ease;
+}
+
+.btn-period.active,
+.btn-period:hover {
+  border-color: transparent;
+  background: var(--accent);
+  color: #0c0f0a;
+  font-weight: 700;
+}
+
+/* ─── INPUTS E SELECTS ───────────────────────────────────── */
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+[data-slot="input"],
+[data-slot="select-trigger"] {
+  background: var(--surface-2) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--ink) !important;
+  border-radius: 8px !important;
+}
+
+input:not([type="checkbox"]):not([type="radio"]):focus,
+select:focus,
+[data-slot="input"]:focus,
+[data-slot="select-trigger"]:focus,
+[data-state="open"][data-slot="select-trigger"] {
+  border-color: var(--accent) !important;
+  outline: none !important;
+  box-shadow: 0 0 0 2px var(--accent-dim) !important;
+}
+
+/* ─── SELECT / POPOVER CONTENT ───────────────────────────── */
+[data-slot="select-content"],
+[role="listbox"],
+[data-radix-popper-content-wrapper]>* {
+  background: var(--surface-2) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 10px !important;
+}
+
+[data-slot="select-item"]:hover,
+[data-slot="select-item"][data-highlighted] {
+  background: var(--accent-dim) !important;
+  color: var(--accent) !important;
+}
+
+[data-slot="separator"],
+hr {
+  border-color: var(--border) !important;
+  opacity: 1 !important;
+}
+
+/* ─── REMOVER SETAS DE INPUT NUMBER ─────────────────────── */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* ─── CALENDÁRIO – RANGE SELECTION ──────────────────────── */
+/* Start/End: fundo verde accent, texto escuro */
+[data-range-start="true"],
+[data-range-end="true"] {
+  background-color: #7cbd3a !important;
+  color: #0c0f0a !important;
+  border-radius: 6px !important;
+}
+
+/* Middle: fundo verde translúcido */
+[data-range-middle="true"] {
+  background-color: rgba(124, 189, 58, 0.18) !important;
+  color: #e4ede0 !important;
+  border-radius: 0 !important;
+}
+
+/* Today dentro do range: não sobrescrever o range */
+[data-range-start="true"].rdp-day_today,
+[data-range-end="true"].rdp-day_today,
+[data-range-middle="true"].rdp-day_today {
+  background-color: #7cbd3a !important;
+}
+
+/* Hover em dias disponíveis */
+[data-slot="calendar"] button:not(:disabled):hover {
+  background-color: rgba(124, 189, 58, 0.12) !important;
+  color: #e4ede0 !important;
+}
