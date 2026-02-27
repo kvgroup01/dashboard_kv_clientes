@@ -37,22 +37,26 @@ const getSheetsClient = () => {
   try {
     credentials = JSON.parse(jsonString);
   } catch (e: any) {
-    console.error("Erro ao parsear JSON de credenciais:", e.message);
     if (jsonString.startsWith("kv-dashboard")) {
-      throw new Error("Você parece ter configurado apenas o e-mail nos Secrets. Por favor, cole o conteúdo INTEGRAL do arquivo .json nos Secrets ou verifique o arquivo enviado.");
+      throw new Error("Você parece ter configurado apenas o e-mail nos Secrets. Cole o conteúdo do arquivo .json");
     }
+    console.error("Erro ao parsear JSON de credenciais:", e.message);
     throw new Error("O conteúdo das credenciais não é um JSON válido.");
   }
 
-  if (!credentials.client_email || !credentials.private_key) {
+  if (!credentials || !credentials.client_email || !credentials.private_key) {
     throw new Error("As credenciais estão incompletas. Certifique-se de que o JSON contém 'client_email' e 'private_key'.");
   }
 
+  // Ensure the private_key is properly formatted, translating encoded newlines if they exist
+  const privateKey = credentials.private_key.split(String.raw`\n`).join('\n');
+
   const auth = new google.auth.JWT({
     email: credentials.client_email,
-    key: credentials.private_key.replace(/\\n/g, '\n'),
+    key: privateKey,
     scopes: ["https://www.googleapis.com/auth/spreadsheets"],
   });
+
   return google.sheets({ version: "v4", auth });
 };
 
@@ -198,7 +202,7 @@ app.get("/api/report/:token", async (req, res) => {
     // 2. Fetch Metrics
     const metricsResponse = await sheets.spreadsheets.values.get({
       spreadsheetId: sheets_id,
-      range: `${aba_metricas}!A2:R`,
+      range: `${aba_metricas}!A2:T`,
     });
     const metricsRows = metricsResponse.data.values || [];
 
@@ -214,29 +218,59 @@ app.get("/api/report/:token", async (req, res) => {
     };
     const toInt = (val: any): number => Math.round(toFloat(val));
 
-    // Map metrics based on the provided columns
+    // Map metrics based on the provided columns and funil type
     const metrics = metricsRows
       .filter(row => row[1]) // Ensure there's at least a date
-      .map(row => ({
-        chave: row[0],
-        data: String(row[1] ?? ""),
-        campanha: String(row[2] ?? ""),
-        conjunto: String(row[3] ?? ""),
-        anuncio: String(row[4] ?? ""),
-        thumbnail: String(row[5] ?? ""),   // col F — URL completa do Facebook CDN
-        link: String(row[6] ?? ""),         // col G (era col F)
-        investimento: toFloat(row[7]),      // col H
-        impressoes: toInt(row[8]),          // col I
-        alcance: toInt(row[9]),             // col J
-        cliques: toInt(row[10]),            // col K
-        cliques_saida: toInt(row[11]),      // col L
-        leads_clique_saida: toInt(row[12]), // col M
-        ctr: toFloat(row[13]),              // col N
-        cpc: toFloat(row[14]),              // col O
-        conversas: toInt(row[15]),          // col P
-        custo_conversa: toFloat(row[16]),   // col Q
-        cpm: toFloat(row[17]),              // col R
-      }));
+      .map(row => {
+        if (tipo_funil === "leads") {
+          // Columns from prompt: id | date_start | campaign_id | ad_id | campaign_name | adset_name | ad_name | spend | impressions | reach | frequency | link_click | initiate_checkout | landing_page_view | purchase | lead | conversao_personalizada | url_anuncio | thumbnail_url | publisher_platform
+          const invest = toFloat(row[7]);
+          const imps = toInt(row[8]);
+          const clicks = toInt(row[11]);
+          return {
+            chave: row[0],
+            data: String(row[1] ?? ""),
+            campanha: String(row[4] ?? ""),
+            conjunto: String(row[5] ?? ""),
+            anuncio: String(row[6] ?? ""),
+            thumbnail: String(row[18] ?? ""),
+            link: String(row[17] ?? ""),
+            investimento: invest,
+            impressoes: imps,
+            alcance: toInt(row[9]),
+            cliques: clicks,
+            leads_meta: toInt(row[15]),
+            ctr: imps > 0 ? (clicks / imps) * 100 : 0,
+            cpc: clicks > 0 ? (invest / clicks) : 0,
+            conversas: toInt(row[15]), // mantem para compatibilidade
+            custo_conversa: toInt(row[15]) > 0 ? invest / toInt(row[15]) : 0,
+            cpm: imps > 0 ? (invest / imps) * 1000 : 0,
+          };
+        } else {
+          // Defaults for WhatsApp
+          return {
+            chave: row[0],
+            data: String(row[1] ?? ""),
+            campanha: String(row[2] ?? ""),
+            conjunto: String(row[3] ?? ""),
+            anuncio: String(row[4] ?? ""),
+            thumbnail: String(row[5] ?? ""),
+            link: String(row[6] ?? ""),
+            investimento: toFloat(row[7]),
+            impressoes: toInt(row[8]),
+            alcance: toInt(row[9]),
+            cliques: toInt(row[10]),
+            cliques_saida: toInt(row[11]),
+            leads_clique_saida: toInt(row[12]),
+            ctr: toFloat(row[13]),
+            cpc: toFloat(row[14]),
+            conversas: toInt(row[15]),
+            custo_conversa: toFloat(row[16]),
+            cpm: toFloat(row[17]),
+            leads_meta: toInt(row[15]),
+          };
+        }
+      });
 
     // 3. Fetch Leads if applicable
     let leads = [];
@@ -246,21 +280,22 @@ app.get("/api/report/:token", async (req, res) => {
         range: `${aba_leads}!A2:K`,
       });
       const leadsRows = leadsResponse.data.values || [];
-      // data | nome | email | telefone | curso_interesse | escolaridade | utm_source | utm_medium | utm_campaign | utm_term | utm_content
+      // data | nome | email | escolaridade | telefone | utm_source | utm_campaign | utm_medium | utm_content | utm_term
+      // Observação: a ordem pode estar ligeiramente diferente do banco anterior. O usuário informou: DATA | NOME | EMAIL | ESCOLARIDADE | TELEFONE | utm_source | utm_campaign | utm_medium | utm_content | utm_term
       leads = leadsRows
-        .filter(row => row[0] || row[1]) // Ensure row is not empty
+        .filter(row => row[0] && row[0].trim() !== "" && row[0].toLowerCase() !== "data") // Pula cabecalho e linhas vazias
         .map(row => ({
-          data: row[0],
-          nome: row[1],
-          email: row[2],
-          telefone: row[3],
-          curso_interesse: row[4],
-          escolaridade: row[5],
-          utm_source: row[6],
-          utm_medium: row[7],
-          utm_campaign: row[8],
-          utm_term: row[9],
-          utm_content: row[10],
+          data: String(row[0] ?? ""),
+          nome: String(row[1] ?? ""),
+          email: String(row[2] ?? ""),
+          escolaridade: String(row[3] ?? ""),
+          telefone: String(row[4] ?? ""),
+          utm_source: String(row[5] ?? ""),
+          utm_campaign: String(row[6] ?? ""),
+          utm_medium: String(row[7] ?? ""),
+          utm_content: String(row[8] ?? ""),
+          utm_term: String(row[9] ?? ""),
+          curso_interesse: "", // backward compatibility
         }));
     }
 

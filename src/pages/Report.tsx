@@ -44,6 +44,7 @@ import { FunnelChart } from "../components/FunnelChart";
 import { KpiCard } from "../components/KpiCard";
 
 interface Metric {
+  chave: string;
   data: string;
   campanha: string;
   conjunto: string;
@@ -56,6 +57,7 @@ interface Metric {
   cliques: number;
   cliques_saida: number;
   leads_clique_saida: number;
+  leads_meta: number; // novo campo (Aba Ads)
   ctr: number;
   cpc: number;
   conversas: number;
@@ -68,7 +70,7 @@ interface Lead {
   nome: string;
   email: string;
   telefone: string;
-  curso_interesse: string;
+  curso_interesse?: string;
   escolaridade: string;
   utm_source: string;
   utm_medium: string;
@@ -275,10 +277,12 @@ function AreaChartInteractive({
 }
 
 // ─── Hierarchical Table ───────────────────────────────────────────────────────
-function HierarchicalTable({ metrics, isWA }: { metrics: Metric[]; isWA: boolean }) {
+function HierarchicalTable({ metrics, leads = [], isWA }: { metrics: Metric[]; leads?: Lead[]; isWA: boolean }) {
   const fmt = (n: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(n);
-  const resultKey = isWA ? "conversas" : "leads_clique_saida";
-  const resultLabel = isWA ? "Conversas" : "Leads";
+  const [utmMatch, setUtmMatch] = useState<"utm_medium" | "utm_content">("utm_medium");
+
+  const resultKey = isWA ? "conversas" : "leads_meta"; // Fallback para a linha do anúncio se não bater UTM
+  const resultLabel = isWA ? "Conversas" : "Leads Reais";
 
   const campaigns = useMemo(() => {
     const map = new Map<string, Map<string, Metric[]>>();
@@ -312,7 +316,24 @@ function HierarchicalTable({ metrics, isWA }: { metrics: Metric[]; isWA: boolean
 
   return (
     <Card className="overflow-hidden animate-fade-up border-0" style={{ animationDelay: "360ms" }}>
-      <div className="p-6 ds-eyebrow mb-0"><h2>DESEMPENHO POR CAMPANHA</h2></div>
+      <div className="p-4 sm:p-6 ds-eyebrow mb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <h2>DESEMPENHO POR CAMPANHA</h2>
+
+        {!isWA && (
+          <div className="flex items-center gap-2">
+            <span style={{ fontSize: 10, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.08em" }}>Cruzar Conjunto com:</span>
+            <Select value={utmMatch} onValueChange={(v: any) => setUtmMatch(v)}>
+              <SelectTrigger className="w-[140px] rounded-lg text-xs h-8 bg-[var(--surface-2)] border-[var(--border)]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="rounded-xl">
+                <SelectItem value="utm_medium" className="rounded-lg">utm_medium</SelectItem>
+                <SelectItem value="utm_content" className="rounded-lg">utm_content</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+      </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
@@ -330,6 +351,10 @@ function HierarchicalTable({ metrics, isWA }: { metrics: Metric[]; isWA: boolean
             {Array.from(campaigns.entries()).map(([camp, conjMap]) => {
               const allM = Array.from(conjMap.values()).flat();
               const cTot = sumM(allM);
+
+              const campLeadsReais = leads.filter(l => l.utm_campaign?.toLowerCase().trim() === camp.toLowerCase().trim()).length;
+              const cResultado = isWA ? cTot.resultado : campLeadsReais;
+
               const isOC = openCamps.has(camp);
               return (
                 <React.Fragment key={camp}>
@@ -344,8 +369,8 @@ function HierarchicalTable({ metrics, isWA }: { metrics: Metric[]; isWA: boolean
                       </div>
                     </td>
                     <td className="px-4 py-3 text-right" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: "var(--ink)", fontWeight: 600 }}>{fmt(cTot.investimento)}</td>
-                    <td className="px-4 py-3 text-right" style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontWeight: 700, color: "var(--accent)", fontSize: 14 }}>{cTot.resultado}</td>
-                    <td className="px-4 py-3 text-right" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: "#f59e0b" }}>{fmt(cTot.resultado > 0 ? cTot.investimento / cTot.resultado : 0)}</td>
+                    <td className="px-4 py-3 text-right" style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontWeight: 700, color: "var(--accent)", fontSize: 14 }}>{cResultado}</td>
+                    <td className="px-4 py-3 text-right" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: "#f59e0b" }}>{fmt(cResultado > 0 ? cTot.investimento / cResultado : 0)}</td>
                     <td className="px-4 py-3 text-right" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: "var(--muted)" }}>{cTot.cliques.toLocaleString()}</td>
                     <td className="px-4 py-3 text-right" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: "var(--muted)" }}>{cTot.alcance.toLocaleString()}</td>
                     <td className="px-4 py-3 text-center">
@@ -355,6 +380,10 @@ function HierarchicalTable({ metrics, isWA }: { metrics: Metric[]; isWA: boolean
 
                   {isOC && Array.from(conjMap.entries()).map(([conj, ads]) => {
                     const conjTot = sumM(ads);
+
+                    const conjLeadsReais = leads.filter(l => l[utmMatch]?.toLowerCase().trim() === conj.toLowerCase().trim()).length;
+                    const conjResultado = isWA ? conjTot.resultado : conjLeadsReais;
+
                     const ck = `${camp}|${conj}`;
                     const isOJ = openConjs.has(ck);
                     return (
@@ -370,8 +399,8 @@ function HierarchicalTable({ metrics, isWA }: { metrics: Metric[]; isWA: boolean
                             </div>
                           </td>
                           <td className="px-4 py-2.5 text-right" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "var(--muted)" }}>{fmt(conjTot.investimento)}</td>
-                          <td className="px-4 py-2.5 text-right" style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontWeight: 600, color: "var(--accent)", fontSize: 13 }}>{conjTot.resultado}</td>
-                          <td className="px-4 py-2.5 text-right" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#f59e0b" }}>{fmt(conjTot.resultado > 0 ? conjTot.investimento / conjTot.resultado : 0)}</td>
+                          <td className="px-4 py-2.5 text-right" style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontWeight: 600, color: "var(--accent)", fontSize: 13 }}>{conjResultado}</td>
+                          <td className="px-4 py-2.5 text-right" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#f59e0b" }}>{fmt(conjResultado > 0 ? conjTot.investimento / conjResultado : 0)}</td>
                           <td className="px-4 py-2.5 text-right" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "var(--muted)" }}>{conjTot.cliques.toLocaleString()}</td>
                           <td className="px-4 py-2.5 text-right" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "var(--muted)" }}>{conjTot.alcance.toLocaleString()}</td>
                           <td className="px-4 py-2.5 text-center">
@@ -414,7 +443,10 @@ function HierarchicalTable({ metrics, isWA }: { metrics: Metric[]; isWA: boolean
           <tfoot>
             {(() => {
               const tot = sumM(metrics);
-              const avgCusto = tot.resultado > 0 ? tot.investimento / tot.resultado : 0;
+
+              const tResultado = isWA ? tot.resultado : leads.length;
+              const avgCusto = tResultado > 0 ? tot.investimento / tResultado : 0;
+
               const tfS: React.CSSProperties = {
                 fontFamily: "'JetBrains Mono', monospace",
                 fontSize: 11,
@@ -432,7 +464,7 @@ function HierarchicalTable({ metrics, isWA }: { metrics: Metric[]; isWA: boolean
                   </td>
                   <td style={{ ...tfS, textAlign: "right", color: "var(--ink)" }}>{fmt(tot.investimento)}</td>
                   <td style={{ ...tfS, textAlign: "right", fontFamily: "'Bricolage Grotesque', sans-serif", fontWeight: 800, fontSize: 16, color: "var(--accent)", letterSpacing: "-0.02em" }}>
-                    {tot.resultado.toLocaleString("pt-BR")}
+                    {tResultado.toLocaleString("pt-BR")}
                   </td>
                   <td style={{ ...tfS, textAlign: "right", color: "#f59e0b" }} title="Custo médio ponderado">{fmt(avgCusto)}</td>
                   <td style={{ ...tfS, textAlign: "right", color: "var(--muted)" }}>{tot.cliques.toLocaleString("pt-BR")}</td>
@@ -632,28 +664,42 @@ export default function Report() {
   const kpis = useMemo(() => {
     if (!filteredData) return null;
     const m = filteredData.metrics;
+    const isWA = filteredData.client.tipo_funil === "whatsapp";
+
     const totalInvestimento = m.reduce((acc, curr) => acc + curr.investimento, 0);
     const totalConversas = m.reduce((acc, curr) => acc + curr.conversas, 0);
-    const totalLeads = m.reduce((acc, curr) => acc + curr.leads_clique_saida, 0);
+    const totalLeadsCliqueSaida = m.reduce((acc, curr) => acc + curr.leads_clique_saida, 0);
+    const totalLeadsMeta = m.reduce((acc, curr) => acc + (curr.leads_meta || 0), 0);
+    const totalLeadsCRM = filteredData.leads.length; // Quantidade real de leads no CRM
     const totalImpressoes = m.reduce((acc, curr) => acc + curr.impressoes, 0);
     const totalCliques = m.reduce((acc, curr) => acc + curr.cliques, 0);
     const totalAlcance = m.reduce((acc, curr) => acc + curr.alcance, 0);
+
     const avgCtr = totalImpressoes > 0 ? (totalCliques / totalImpressoes) * 100 : 0;
     const avgCpm = totalImpressoes > 0 ? (totalInvestimento / totalImpressoes) * 1000 : 0;
-    const custoPorResultado = filteredData.client.tipo_funil === "whatsapp"
+
+    // Custos para funil de leads
+    const custoPorLeadReal = totalLeadsCRM > 0 ? totalInvestimento / totalLeadsCRM : 0;
+    const custoPorLeadMeta = totalLeadsMeta > 0 ? totalInvestimento / totalLeadsMeta : 0;
+
+    const custoPorResultado = isWA
       ? (totalConversas > 0 ? totalInvestimento / totalConversas : 0)
-      : (totalLeads > 0 ? totalInvestimento / totalLeads : 0);
+      : custoPorLeadReal;
 
     return {
       investimento: totalInvestimento,
       conversas: totalConversas,
-      leads: totalLeads,
+      leads: totalLeadsCliqueSaida, // fallback whatsapp legacy
+      leads_meta: totalLeadsMeta,
+      leads_crm: totalLeadsCRM,
       impressoes: totalImpressoes,
       cliques: totalCliques,
       alcance: totalAlcance,
       ctr: avgCtr,
       cpm: avgCpm,
-      custoPorResultado
+      custoPorResultado,
+      custoPorLeadReal,
+      custoPorLeadMeta
     };
   }, [filteredData]);
 
@@ -666,10 +712,22 @@ export default function Report() {
         grouped[m.data] = { data: m.data, conversas: 0, leads: 0, alcance: 0, investimento: 0 };
       }
       grouped[m.data].conversas += m.conversas;
-      grouped[m.data].leads += m.leads_clique_saida;
       grouped[m.data].alcance += m.alcance;
       grouped[m.data].investimento += m.investimento;
+
+      if (filteredData.client.tipo_funil === "whatsapp") {
+        grouped[m.data].leads += m.leads_clique_saida; // Legacy
+      }
     });
+
+    if (filteredData.client.tipo_funil === "leads") {
+      filteredData.leads.forEach(l => {
+        if (!grouped[l.data]) {
+          grouped[l.data] = { data: l.data, conversas: 0, leads: 0, alcance: 0, investimento: 0 };
+        }
+        grouped[l.data].leads += 1;
+      });
+    }
     return Object.values(grouped).sort((a, b) => {
       const da = String(a.data).split("/").reverse().join("");
       const db = String(b.data).split("/").reverse().join("");
@@ -681,7 +739,7 @@ export default function Report() {
     if (!filteredData) return [];
     return filteredData.leads.filter(l => {
       const sourceMatch = !leadsFilterSource || l.utm_source.toLowerCase().includes(leadsFilterSource.toLowerCase());
-      const courseMatch = !leadsFilterCourse || l.curso_interesse.toLowerCase().includes(leadsFilterCourse.toLowerCase());
+      const courseMatch = !leadsFilterCourse || l.escolaridade.toLowerCase().includes(leadsFilterCourse.toLowerCase());
       return sourceMatch && courseMatch;
     });
   }, [filteredData, leadsFilterSource, leadsFilterCourse]);
@@ -711,7 +769,7 @@ export default function Report() {
   const accentGradient = isWA ? "from-[#25d366] to-[#128c7e]" : "from-[#4f8ef7] to-[#1e40af]";
 
   // Taxa de conversão: Conv./Leads → Input do cliente
-  const convBase = isWA ? kpis.conversas : kpis.leads;
+  const convBase = isWA ? kpis.conversas : kpis.leads_crm;
   const convRate = convBase > 0 && customFunnelValue > 0
     ? Math.min(100, (customFunnelValue / convBase) * 100)
     : 0;
@@ -771,10 +829,22 @@ export default function Report() {
         {/* KPI Cards */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <KpiCard label="Investimento" numericValue={kpis.investimento} accentColor="var(--red)" delay={0} formatAs="currency" />
-          <KpiCard label={isWA ? "Conversas" : "Leads"} numericValue={isWA ? kpis.conversas : kpis.leads} accentColor={accentColor} delay={60} formatAs="number" />
-          <KpiCard label={`Custo/${isWA ? "Conv." : "Lead"}`} numericValue={kpis.custoPorResultado} accentColor="var(--orange)" delay={120} formatAs="currency" />
-          <KpiCard label="CTR Médio" numericValue={kpis.ctr} accentColor="var(--purple)" delay={180} formatAs="percent" />
-          <KpiCard label="CPM Médio" numericValue={kpis.cpm} accentColor="var(--gray)" delay={240} formatAs="currency" colSpan2 />
+
+          {isWA ? (
+            <>
+              <KpiCard label="Conversas" numericValue={kpis.conversas} accentColor={accentColor} delay={60} formatAs="number" />
+              <KpiCard label="Custo/Conv." numericValue={kpis.custoPorResultado} accentColor="var(--orange)" delay={120} formatAs="currency" />
+              <KpiCard label="CTR Médio" numericValue={kpis.ctr} accentColor="var(--purple)" delay={180} formatAs="percent" />
+              <KpiCard label="CPM Médio" numericValue={kpis.cpm} accentColor="var(--gray)" delay={240} formatAs="currency" />
+            </>
+          ) : (
+            <>
+              <KpiCard label="Leads (CRM)" numericValue={kpis.leads_crm} accentColor={accentColor} delay={60} formatAs="number" />
+              <KpiCard label="Custo/Lead (Real)" numericValue={kpis.custoPorLeadReal} accentColor="var(--orange)" delay={120} formatAs="currency" />
+              <KpiCard label="Leads (Meta)" numericValue={kpis.leads_meta} accentColor="var(--purple)" delay={180} formatAs="number" />
+              <KpiCard label="Custo/Lead (Meta)" numericValue={kpis.custoPorLeadMeta} accentColor="var(--gray)" delay={240} formatAs="currency" />
+            </>
+          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
@@ -787,12 +857,20 @@ export default function Report() {
 
               <FunnelChart
                 isWA={isWA}
-                steps={[
-                  { label: "Impressões", value: kpis.impressoes },
-                  { label: "Alcance", value: kpis.alcance },
-                  { label: "Cliques", value: kpis.cliques },
-                  { label: isWA ? "Conversas Iniciadas" : "Leads Captados", value: isWA ? kpis.conversas : kpis.leads },
-                ]}
+                steps={
+                  isWA ? [
+                    { label: "Impressões", value: kpis.impressoes },
+                    { label: "Alcance", value: kpis.alcance },
+                    { label: "Cliques", value: kpis.cliques },
+                    { label: "Conversas Iniciadas", value: kpis.conversas },
+                  ] : [
+                    { label: "Impressões", value: kpis.impressoes },
+                    { label: "Alcance", value: kpis.alcance },
+                    { label: "Cliques", value: kpis.cliques },
+                    { label: "Leads (Meta)", value: kpis.leads_meta },
+                    { label: "Leads (CRM)", value: kpis.leads_crm },
+                  ]
+                }
                 customStep={{
                   label: customFunnelLabel,
                   value: customFunnelValue,
@@ -847,7 +925,7 @@ export default function Report() {
         </div>
 
         {/* Hierarchical Metrics Table */}
-        <HierarchicalTable metrics={filteredData.metrics} isWA={isWA} />
+        <HierarchicalTable metrics={filteredData.metrics} leads={filteredData.leads} isWA={isWA} />
 
         {/* Ad Gallery */}
         <AdGallery metrics={filteredData.metrics} isWA={isWA} />
@@ -867,7 +945,7 @@ export default function Report() {
                   onChange={e => setLeadsFilterSource(e.target.value)}
                 />
                 <Input
-                  placeholder="Filtrar por Curso"
+                  placeholder="Filtrar por Escolaridade"
                   className="w-48 h-9 text-xs"
                   value={leadsFilterCourse}
                   onChange={e => setLeadsFilterCourse(e.target.value)}
@@ -883,7 +961,7 @@ export default function Report() {
                       <th className="px-6 py-4">Data</th>
                       <th className="px-6 py-4">Nome</th>
                       <th className="px-6 py-4">Contato</th>
-                      <th className="px-6 py-4">Curso</th>
+                      <th className="px-6 py-4">Escolaridade</th>
                       <th className="px-6 py-4 text-right">Origem (UTM)</th>
                     </tr>
                   </thead>
@@ -903,12 +981,12 @@ export default function Report() {
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          <Badge variant="default">{l.curso_interesse}</Badge>
+                          <Badge variant="default">{l.escolaridade}</Badge>
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex flex-col">
                             <span className="text-xs font-bold">{l.utm_source}</span>
-                            <span className="text-[10px] text-zinc-600">{l.utm_campaign}</span>
+                            <span className="text-[10px] text-zinc-600">{l.utm_campaign} | {l.utm_medium} | {l.utm_content}</span>
                           </div>
                         </td>
                       </tr>
