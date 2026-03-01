@@ -480,6 +480,194 @@ function HierarchicalTable({ metrics, leads = [], isWA }: { metrics: Metric[]; l
   );
 }
 
+// ─── Leads Quality Heatmap ───────────────────────────────────────────────────
+const SUPERIOR_KEYWORDS = ["superior", "graduaç", "graduac", "bacharel", "licencia", "pós", "pos-", "mestrado", "doutorado", "mba", "especializ"];
+
+function isEnsuperiorOuAcima(escolaridade: string): boolean {
+  if (!escolaridade) return false;
+  const normalized = escolaridade.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  return SUPERIOR_KEYWORDS.some(kw => normalized.includes(kw.normalize("NFD").replace(/[\u0300-\u036f]/g, "")));
+}
+
+function getQualityColor(pct: number): { bg: string; text: string; label: string } {
+  if (pct >= 30) return { bg: "rgba(239,68,68,0.15)", text: "#ef4444", label: "Descartar" };
+  if (pct >= 15) return { bg: "rgba(245,158,11,0.15)", text: "#f59e0b", label: "Atenção" };
+  return { bg: "rgba(124,189,58,0.12)", text: "var(--accent)", label: "Excelente" };
+}
+
+interface HeatmapGroup {
+  name: string;
+  total: number;
+  medio: number;
+  superior: number;
+  pct: number;
+}
+
+function LeadsHeatmap({
+  leads,
+  groupByOptions,
+  title,
+}: {
+  leads: Lead[];
+  groupByOptions: { label: string; value: "utm_medium" | "utm_content" | "utm_term" }[];
+  title: string;
+}) {
+  const [groupBy, setGroupBy] = useState<"utm_medium" | "utm_content" | "utm_term">(groupByOptions[0].value);
+
+  const groups = useMemo<HeatmapGroup[]>(() => {
+    const map = new Map<string, { medio: number; superior: number }>();
+    for (const lead of leads) {
+      const key = (lead[groupBy] || "").trim();
+      if (!key) continue;
+      if (!map.has(key)) map.set(key, { medio: 0, superior: 0 });
+      const entry = map.get(key)!;
+      if (isEnsuperiorOuAcima(lead.escolaridade)) {
+        entry.superior++;
+      } else {
+        entry.medio++;
+      }
+    }
+    return Array.from(map.entries())
+      .map(([name, { medio, superior }]) => {
+        const total = medio + superior;
+        return { name, total, medio, superior, pct: total > 0 ? (medio / total) * 100 : 0 };
+      })
+      .sort((a, b) => b.total - a.total);
+  }, [leads, groupBy]);
+
+  const thS: React.CSSProperties = {
+    fontFamily: "'JetBrains Mono', monospace",
+    fontSize: 10,
+    letterSpacing: "0.08em",
+    textTransform: "uppercase" as const,
+    color: "var(--muted)",
+    padding: "12px 16px",
+    background: "var(--surface-2)",
+    whiteSpace: "nowrap" as const,
+  };
+
+  return (
+    <Card className="overflow-hidden animate-fade-up border-0">
+      <div className="p-4 sm:p-6 ds-eyebrow mb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <h2>{title}</h2>
+        <div className="flex items-center gap-2">
+          <span style={{ fontSize: 10, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+            Agrupar por:
+          </span>
+          <Select value={groupBy} onValueChange={(v: any) => setGroupBy(v)}>
+            <SelectTrigger className="w-[140px] rounded-lg text-xs h-8 bg-[var(--surface-2)] border-[var(--border)]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="rounded-xl">
+              {groupByOptions.map(opt => (
+                <SelectItem key={opt.value} value={opt.value} className="rounded-lg">{opt.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr>
+              <th style={{ ...thS, textAlign: "left", width: "40%" }}>
+                {groupByOptions.find(o => o.value === groupBy)?.label}
+              </th>
+              <th style={{ ...thS, textAlign: "right" }}>Total</th>
+              <th style={{ ...thS, textAlign: "right" }}>Ensino Médio</th>
+              <th style={{ ...thS, textAlign: "right" }}>Ensino Superior</th>
+              <th style={{ ...thS, textAlign: "center" }}>% Médio</th>
+            </tr>
+          </thead>
+          <tbody>
+            {groups.length === 0 ? (
+              <tr>
+                <td colSpan={5} style={{ padding: "32px 16px", textAlign: "center", color: "var(--muted)", fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
+                  Nenhum dado disponível para o campo selecionado
+                </td>
+              </tr>
+            ) : groups.map((g, i) => {
+              const col = getQualityColor(g.pct);
+              return (
+                <tr key={g.name}
+                  style={{ borderBottom: "1px solid var(--border)", background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.01)" }}>
+                  <td className="px-4 py-3" style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontWeight: 600, fontSize: 13, color: "var(--ink)", maxWidth: 360, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {g.name}
+                  </td>
+                  <td className="px-4 py-3 text-right" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, fontWeight: 700, color: "var(--ink)" }}>
+                    {g.total.toLocaleString("pt-BR")}
+                  </td>
+                  <td className="px-4 py-3 text-right" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: "#ef4444" }}>
+                    {g.medio.toLocaleString("pt-BR")}
+                  </td>
+                  <td className="px-4 py-3 text-right" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: "var(--accent)" }}>
+                    {g.superior.toLocaleString("pt-BR")}
+                  </td>
+                  <td className="px-4 py-3" style={{ textAlign: "center" }}>
+                    <div style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                      {/* Progress bar */}
+                      <div style={{ width: 80, height: 6, borderRadius: 3, background: "var(--surface-2)", overflow: "hidden" }}>
+                        <div style={{ width: `${Math.min(100, g.pct)}%`, height: "100%", borderRadius: 3, background: col.text, transition: "width 500ms ease" }} />
+                      </div>
+                      {/* Badge */}
+                      <span style={{
+                        fontSize: 11,
+                        fontFamily: "'JetBrains Mono', monospace",
+                        fontWeight: 700,
+                        color: col.text,
+                        background: col.bg,
+                        padding: "2px 8px",
+                        borderRadius: 6,
+                        minWidth: 50,
+                        textAlign: "center",
+                        display: "inline-block",
+                      }}>
+                        {g.pct.toFixed(1)}%
+                      </span>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+          {groups.length > 0 && (
+            <tfoot>
+              <tr style={{ borderTop: "2px solid var(--accent-border)", background: "rgba(124,189,58,0.06)" }}>
+                <td style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontWeight: 700, fontSize: 12, color: "var(--muted)", padding: "14px 16px", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                  TOTAL
+                </td>
+                <td style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, fontWeight: 700, color: "var(--ink)", padding: "14px 16px", textAlign: "right" }}>
+                  {groups.reduce((a, g) => a + g.total, 0).toLocaleString("pt-BR")}
+                </td>
+                <td style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: "#ef4444", padding: "14px 16px", textAlign: "right" }}>
+                  {groups.reduce((a, g) => a + g.medio, 0).toLocaleString("pt-BR")}
+                </td>
+                <td style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: "var(--accent)", padding: "14px 16px", textAlign: "right" }}>
+                  {groups.reduce((a, g) => a + g.superior, 0).toLocaleString("pt-BR")}
+                </td>
+                <td style={{ padding: "14px 16px", textAlign: "center" }}>
+                  {(() => {
+                    const totMedio = groups.reduce((a, g) => a + g.medio, 0);
+                    const totAll = groups.reduce((a, g) => a + g.total, 0);
+                    const pct = totAll > 0 ? (totMedio / totAll) * 100 : 0;
+                    const col = getQualityColor(pct);
+                    return (
+                      <span style={{ fontSize: 12, fontFamily: "'JetBrains Mono', monospace", fontWeight: 800, color: col.text, background: col.bg, padding: "2px 10px", borderRadius: 6 }}>
+                        {pct.toFixed(1)}%
+                      </span>
+                    );
+                  })()}
+                </td>
+              </tr>
+            </tfoot>
+          )}
+        </table>
+      </div>
+    </Card>
+  );
+}
+
 // ─── Ad Gallery ─────────────────────────────────────────────────────────────
 function AdGallery({ metrics, isWA }: { metrics: Metric[]; isWA: boolean }) {
   const resultKey = isWA ? "conversas" : "leads_clique_saida";
@@ -1021,6 +1209,26 @@ export default function Report() {
                 </div>
               </div>
             </Card>
+
+            {/* Mapa de Calor — Públicos */}
+            <LeadsHeatmap
+              leads={filteredData.leads}
+              title="MAPA DE CALOR — PÚBLICOS"
+              groupByOptions={[
+                { label: "UTM Medium", value: "utm_medium" },
+                { label: "UTM Content", value: "utm_content" },
+              ]}
+            />
+
+            {/* Mapa de Calor — Criativos */}
+            <LeadsHeatmap
+              leads={filteredData.leads}
+              title="MAPA DE CALOR — CRIATIVOS"
+              groupByOptions={[
+                { label: "UTM Content", value: "utm_content" },
+                { label: "UTM Term", value: "utm_term" },
+              ]}
+            />
           </div>
         )}
       </main>
