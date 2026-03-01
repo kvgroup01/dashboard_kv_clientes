@@ -513,6 +513,16 @@ function LeadsHeatmap({
   title: string;
 }) {
   const [groupBy, setGroupBy] = useState<"utm_medium" | "utm_content" | "utm_term">(groupByOptions[0].value);
+  const [sortDir, setSortDir] = useState<"asc" | "desc" | "total">("total");
+  const [cutItems, setCutItems] = useState<Set<string>>(new Set());
+
+  const toggleCut = (name: string) => {
+    setCutItems(prev => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name); else next.add(name);
+      return next;
+    });
+  };
 
   const groups = useMemo<HeatmapGroup[]>(() => {
     const map = new Map<string, { medio: number; superior: number }>();
@@ -521,19 +531,26 @@ function LeadsHeatmap({
       if (!key) continue;
       if (!map.has(key)) map.set(key, { medio: 0, superior: 0 });
       const entry = map.get(key)!;
-      if (isEnsuperiorOuAcima(lead.escolaridade)) {
-        entry.superior++;
-      } else {
-        entry.medio++;
-      }
+      if (isEnsuperiorOuAcima(lead.escolaridade)) entry.superior++;
+      else entry.medio++;
     }
-    return Array.from(map.entries())
-      .map(([name, { medio, superior }]) => {
-        const total = medio + superior;
-        return { name, total, medio, superior, pct: total > 0 ? (medio / total) * 100 : 0 };
-      })
-      .sort((a, b) => b.total - a.total);
-  }, [leads, groupBy]);
+    const raw = Array.from(map.entries()).map(([name, { medio, superior }]) => {
+      const total = medio + superior;
+      return { name, total, medio, superior, pct: total > 0 ? (medio / total) * 100 : 0 };
+    });
+
+    // Sort active items
+    const active = raw.filter(g => !cutItems.has(g.name));
+    const cut = raw.filter(g => cutItems.has(g.name));
+
+    const sortFn = (a: HeatmapGroup, b: HeatmapGroup) => {
+      if (sortDir === "asc") return a.pct - b.pct;
+      if (sortDir === "desc") return b.pct - a.pct;
+      return b.total - a.total;
+    };
+
+    return [...active.sort(sortFn), ...cut.sort(sortFn)];
+  }, [leads, groupBy, sortDir, cutItems]);
 
   const thS: React.CSSProperties = {
     fontFamily: "'JetBrains Mono', monospace",
@@ -544,26 +561,68 @@ function LeadsHeatmap({
     padding: "12px 16px",
     background: "var(--surface-2)",
     whiteSpace: "nowrap" as const,
+    userSelect: "none" as const,
   };
+
+  const SortBtn = ({ dir, label }: { dir: "asc" | "desc" | "total"; label: string }) => (
+    <button
+      onClick={() => setSortDir(dir)}
+      style={{
+        fontSize: 10,
+        fontFamily: "'JetBrains Mono', monospace",
+        padding: "3px 8px",
+        borderRadius: 5,
+        border: sortDir === dir ? "1px solid var(--accent)" : "1px solid var(--border)",
+        background: sortDir === dir ? "rgba(124,189,58,0.12)" : "transparent",
+        color: sortDir === dir ? "var(--accent)" : "var(--muted)",
+        cursor: "pointer",
+        letterSpacing: "0.06em",
+        textTransform: "uppercase",
+        transition: "all 150ms",
+      }}
+    >{label}</button>
+  );
+
+  const activeCounts = groups.filter(g => !cutItems.has(g.name));
 
   return (
     <Card className="overflow-hidden animate-fade-up border-0">
-      <div className="p-4 sm:p-6 ds-eyebrow mb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      {/* Header */}
+      <div className="p-4 sm:p-6 ds-eyebrow mb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <h2>{title}</h2>
-        <div className="flex items-center gap-2">
-          <span style={{ fontSize: 10, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-            Agrupar por:
-          </span>
-          <Select value={groupBy} onValueChange={(v: any) => setGroupBy(v)}>
-            <SelectTrigger className="w-[140px] rounded-lg text-xs h-8 bg-[var(--surface-2)] border-[var(--border)]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="rounded-xl">
-              {groupByOptions.map(opt => (
-                <SelectItem key={opt.value} value={opt.value} className="rounded-lg">{opt.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Sort buttons */}
+          <div className="flex items-center gap-1">
+            <span style={{ fontSize: 10, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.08em", marginRight: 4 }}>Ordenar:</span>
+            <SortBtn dir="total" label="Volume" />
+            <SortBtn dir="asc" label="↑ %" />
+            <SortBtn dir="desc" label="↓ %" />
+          </div>
+
+          {/* Divider */}
+          <div style={{ width: 1, height: 20, background: "var(--border)" }} />
+
+          {/* Group selector */}
+          <div className="flex items-center gap-2">
+            <span style={{ fontSize: 10, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.08em" }}>Agrupar:</span>
+            <Select value={groupBy} onValueChange={(v: any) => setGroupBy(v)}>
+              <SelectTrigger className="w-[130px] rounded-lg text-xs h-8 bg-[var(--surface-2)] border-[var(--border)]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="rounded-xl">
+                {groupByOptions.map(opt => (
+                  <SelectItem key={opt.value} value={opt.value} className="rounded-lg">{opt.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Cut counter badge */}
+          {cutItems.size > 0 && (
+            <span style={{ fontSize: 10, fontFamily: "'JetBrains Mono', monospace", background: "rgba(239,68,68,0.12)", color: "#ef4444", padding: "3px 8px", borderRadius: 6, fontWeight: 700 }}>
+              {cutItems.size} cortado{cutItems.size !== 1 ? "s" : ""}
+            </span>
+          )}
         </div>
       </div>
 
@@ -571,46 +630,79 @@ function LeadsHeatmap({
         <table className="w-full text-sm">
           <thead>
             <tr>
-              <th style={{ ...thS, textAlign: "left", width: "40%" }}>
+              <th style={{ ...thS, textAlign: "left", width: "35%" }}>
                 {groupByOptions.find(o => o.value === groupBy)?.label}
               </th>
               <th style={{ ...thS, textAlign: "right" }}>Total</th>
               <th style={{ ...thS, textAlign: "right" }}>Ensino Médio</th>
               <th style={{ ...thS, textAlign: "right" }}>Ensino Superior</th>
               <th style={{ ...thS, textAlign: "center" }}>% Médio</th>
+              <th style={{ ...thS, textAlign: "center" }}>Ação</th>
             </tr>
           </thead>
           <tbody>
             {groups.length === 0 ? (
               <tr>
-                <td colSpan={5} style={{ padding: "32px 16px", textAlign: "center", color: "var(--muted)", fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
+                <td colSpan={6} style={{ padding: "32px 16px", textAlign: "center", color: "var(--muted)", fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
                   Nenhum dado disponível para o campo selecionado
                 </td>
               </tr>
             ) : groups.map((g, i) => {
-              const col = getQualityColor(g.pct);
+              const isCut = cutItems.has(g.name);
+              const col = isCut
+                ? { bg: "rgba(113,113,122,0.1)", text: "var(--muted)", label: "Cortado" }
+                : getQualityColor(g.pct);
+
               return (
-                <tr key={g.name}
-                  style={{ borderBottom: "1px solid var(--border)", background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.01)" }}>
-                  <td className="px-4 py-3" style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontWeight: 600, fontSize: 13, color: "var(--ink)", maxWidth: 360, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <tr key={g.name} style={{
+                  borderBottom: "1px solid var(--border)",
+                  background: isCut
+                    ? "rgba(239,68,68,0.04)"
+                    : i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.01)",
+                  opacity: isCut ? 0.6 : 1,
+                  transition: "opacity 200ms",
+                }}>
+                  {/* Nome */}
+                  <td className="px-4 py-3" style={{
+                    fontFamily: "'Bricolage Grotesque', sans-serif",
+                    fontWeight: 600,
+                    fontSize: 13,
+                    color: isCut ? "var(--muted)" : "var(--ink)",
+                    maxWidth: 300,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    textDecoration: isCut ? "line-through" : "none",
+                  }}>
                     {g.name}
+                    {isCut && (
+                      <span style={{ marginLeft: 8, fontSize: 10, background: "rgba(239,68,68,0.12)", color: "#ef4444", padding: "1px 6px", borderRadius: 4, fontFamily: "'JetBrains Mono', monospace", verticalAlign: "middle", textDecoration: "none", display: "inline-block" }}>
+                        CORTADO
+                      </span>
+                    )}
                   </td>
-                  <td className="px-4 py-3 text-right" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, fontWeight: 700, color: "var(--ink)" }}>
+
+                  {/* Total */}
+                  <td className="px-4 py-3 text-right" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, fontWeight: 700, color: isCut ? "var(--muted)" : "var(--ink)" }}>
                     {g.total.toLocaleString("pt-BR")}
                   </td>
-                  <td className="px-4 py-3 text-right" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: "#ef4444" }}>
+
+                  {/* Ensino Médio */}
+                  <td className="px-4 py-3 text-right" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: isCut ? "var(--muted)" : "#ef4444" }}>
                     {g.medio.toLocaleString("pt-BR")}
                   </td>
-                  <td className="px-4 py-3 text-right" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: "var(--accent)" }}>
+
+                  {/* Ensino Superior */}
+                  <td className="px-4 py-3 text-right" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: isCut ? "var(--muted)" : "var(--accent)" }}>
                     {g.superior.toLocaleString("pt-BR")}
                   </td>
+
+                  {/* % Médio */}
                   <td className="px-4 py-3" style={{ textAlign: "center" }}>
                     <div style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                      {/* Progress bar */}
-                      <div style={{ width: 80, height: 6, borderRadius: 3, background: "var(--surface-2)", overflow: "hidden" }}>
+                      <div style={{ width: 72, height: 6, borderRadius: 3, background: "var(--surface-2)", overflow: "hidden" }}>
                         <div style={{ width: `${Math.min(100, g.pct)}%`, height: "100%", borderRadius: 3, background: col.text, transition: "width 500ms ease" }} />
                       </div>
-                      {/* Badge */}
                       <span style={{
                         fontSize: 11,
                         fontFamily: "'JetBrains Mono', monospace",
@@ -627,29 +719,58 @@ function LeadsHeatmap({
                       </span>
                     </div>
                   </td>
+
+                  {/* Ação — Cortar / Restaurar */}
+                  <td className="px-4 py-3" style={{ textAlign: "center" }}>
+                    <button
+                      onClick={() => toggleCut(g.name)}
+                      style={{
+                        fontSize: 11,
+                        fontFamily: "'JetBrains Mono', monospace",
+                        fontWeight: 700,
+                        padding: "4px 12px",
+                        borderRadius: 6,
+                        border: isCut
+                          ? "1px solid rgba(124,189,58,0.4)"
+                          : "1px solid rgba(239,68,68,0.4)",
+                        background: isCut
+                          ? "rgba(124,189,58,0.08)"
+                          : "rgba(239,68,68,0.08)",
+                        color: isCut ? "var(--accent)" : "#ef4444",
+                        cursor: "pointer",
+                        letterSpacing: "0.06em",
+                        textTransform: "uppercase",
+                        transition: "all 150ms",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {isCut ? "✓ Restaurar" : "✂ Cortar"}
+                    </button>
+                  </td>
                 </tr>
               );
             })}
           </tbody>
+
           {groups.length > 0 && (
             <tfoot>
               <tr style={{ borderTop: "2px solid var(--accent-border)", background: "rgba(124,189,58,0.06)" }}>
                 <td style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontWeight: 700, fontSize: 12, color: "var(--muted)", padding: "14px 16px", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-                  TOTAL
+                  ATIVOS ({activeCounts.length}/{groups.length})
                 </td>
                 <td style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, fontWeight: 700, color: "var(--ink)", padding: "14px 16px", textAlign: "right" }}>
-                  {groups.reduce((a, g) => a + g.total, 0).toLocaleString("pt-BR")}
+                  {activeCounts.reduce((a, g) => a + g.total, 0).toLocaleString("pt-BR")}
                 </td>
                 <td style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: "#ef4444", padding: "14px 16px", textAlign: "right" }}>
-                  {groups.reduce((a, g) => a + g.medio, 0).toLocaleString("pt-BR")}
+                  {activeCounts.reduce((a, g) => a + g.medio, 0).toLocaleString("pt-BR")}
                 </td>
                 <td style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: "var(--accent)", padding: "14px 16px", textAlign: "right" }}>
-                  {groups.reduce((a, g) => a + g.superior, 0).toLocaleString("pt-BR")}
+                  {activeCounts.reduce((a, g) => a + g.superior, 0).toLocaleString("pt-BR")}
                 </td>
-                <td style={{ padding: "14px 16px", textAlign: "center" }}>
+                <td style={{ padding: "14px 16px", textAlign: "center" }} colSpan={2}>
                   {(() => {
-                    const totMedio = groups.reduce((a, g) => a + g.medio, 0);
-                    const totAll = groups.reduce((a, g) => a + g.total, 0);
+                    const totMedio = activeCounts.reduce((a, g) => a + g.medio, 0);
+                    const totAll = activeCounts.reduce((a, g) => a + g.total, 0);
                     const pct = totAll > 0 ? (totMedio / totAll) * 100 : 0;
                     const col = getQualityColor(pct);
                     return (
